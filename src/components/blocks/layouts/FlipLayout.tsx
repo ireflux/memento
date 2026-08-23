@@ -3,15 +3,24 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
-export function FlipLayout({ pages }: { pages: ReactNode[] }) {
-  const [idx, setIdx] = useState(0);
+export function FlipLayout({
+  pages,
+  fill = false,
+}: {
+  pages: ReactNode[];
+  fill?: boolean;
+}) {
+  const [rawIdx, setRawIdx] = useState(0);
   const [dir, setDir] = useState(1);
   const touch = useRef<{ x: number; y: number } | null>(null);
 
+  const last = pages.length - 1;
+  const idx = Math.min(rawIdx, Math.max(0, last));
+
   const go = (next: number) => {
-    if (next < 0 || next >= pages.length) return;
+    if (next < 0 || next > last || next === idx) return;
     setDir(next > idx ? 1 : -1);
-    setIdx(next);
+    setRawIdx(next);
   };
 
   useEffect(() => {
@@ -27,7 +36,7 @@ export function FlipLayout({ pages }: { pages: ReactNode[] }) {
 
   return (
     <div
-      className="relative h-dvh overflow-hidden"
+      className={`relative overflow-hidden ${fill ? "h-full" : "h-dvh"}`}
       onTouchStart={(e) => {
         const t = e.touches[0];
         touch.current = { x: t.clientX, y: t.clientY };
@@ -69,7 +78,7 @@ export function FlipLayout({ pages }: { pages: ReactNode[] }) {
           ‹
         </button>
       ) : null}
-      {idx < pages.length - 1 ? (
+      {idx < last ? (
         <button
           type="button"
           aria-label="下一页"
@@ -80,7 +89,7 @@ export function FlipLayout({ pages }: { pages: ReactNode[] }) {
         </button>
       ) : null}
 
-      {pages.length > 1 ? (
+      {last > 0 ? (
         <div className="absolute bottom-5 left-1/2 z-10 flex -translate-x-1/2 gap-2">
           {pages.map((_, i) => (
             <button

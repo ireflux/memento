@@ -21,13 +21,18 @@ export function InvitationShell({
   theme,
   children,
   className = "",
+  fill = false,
 }: {
   theme: ThemeTokens;
   children: ReactNode;
   className?: string;
+  fill?: boolean;
 }) {
   return (
-    <div style={themeCssVars(theme)} className={`min-h-dvh ${className}`}>
+    <div
+      style={themeCssVars(theme)}
+      className={`${fill ? "h-full" : "min-h-dvh"} ${className}`}
+    >
       {children}
     </div>
   );

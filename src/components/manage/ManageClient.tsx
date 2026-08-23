@@ -53,9 +53,10 @@ export function ManageClient({
   const [copied, setCopied] = useState(false);
 
   const attendingYes = rsvps.filter((r) => r.attending === "yes");
-  const totalGuests =
-    attendingYes.reduce((s, r) => s + r.partySize, 0) +
-    attendingYes.length;
+  const totalGuests = attendingYes.reduce(
+    (sum, r) => sum + r.partySize,
+    0,
+  );
 
   const setStatus = async (next: "published" | "closed") => {
     setBusy(true);

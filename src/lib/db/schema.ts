@@ -50,9 +50,7 @@ export const mediaAssets = pgTable(
   "media_assets",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    invitationId: uuid("invitation_id")
-      .notNull()
-      .references(() => invitations.id, { onDelete: "cascade" }),
+    invitationId: uuid("invitation_id").notNull(),
     url: text("url").notNull(),
     mime: text("mime").notNull(),
     sizeBytes: integer("size_bytes").notNull(),
@@ -67,9 +65,7 @@ export const rsvps = pgTable(
   "rsvps",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    invitationId: uuid("invitation_id")
-      .notNull()
-      .references(() => invitations.id, { onDelete: "cascade" }),
+    invitationId: uuid("invitation_id").notNull(),
     guestName: text("guest_name").notNull(),
     phone: text("phone"),
     attending: attendingEnum("attending").notNull(),
@@ -86,9 +82,7 @@ export const blessings = pgTable(
   "blessings",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    invitationId: uuid("invitation_id")
-      .notNull()
-      .references(() => invitations.id, { onDelete: "cascade" }),
+    invitationId: uuid("invitation_id").notNull(),
     guestName: text("guest_name").notNull(),
     content: text("content").notNull(),
     status: blessingStatusEnum("status").notNull().default("visible"),

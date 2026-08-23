@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { getInvitationBySlug, getVisibleBlessings } from "@/lib/queries";
 import { getTemplate } from "@/templates/registry";
 import { InvitationShell } from "@/components/blocks/layouts/InvitationShell";
@@ -12,14 +13,14 @@ import { ViewTracker } from "@/components/blocks/ViewTracker";
 
 export const dynamic = "force-dynamic";
 
-async function loadInvitation(slug: string) {
+const loadInvitation = cache(async (slug: string) => {
   try {
     return await getInvitationBySlug(slug);
   } catch (e) {
     console.error("[invitation] load failed", e);
     return null;
   }
-}
+});
 
 export async function generateMetadata({
   params,

@@ -2,7 +2,7 @@ export const LIMITS = {
   contentBytes: 256 * 1024,
   maxPages: 12,
   maxImagesPerGallery: 30,
-  maxImageBytes: 5 * 1024 * 1024,
+  maxImageBytes: 4 * 1024 * 1024,
   guestNameMax: 20,
   blessingMax: 200,
   rsvpNoteMax: 100,

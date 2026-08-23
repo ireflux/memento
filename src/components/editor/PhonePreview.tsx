@@ -32,13 +32,18 @@ export function PhonePreview({
 
   let body: ReactNode;
   if (template.layout === "flip") {
-    body = <FlipLayout pages={pages} />;
-  } else if (template.layout === "long") {
-    body = <LongLayout pages={pages} />;
+    body = (
+      <InvitationShell theme={template.theme} fill>
+        <FlipLayout pages={pages} fill />
+      </InvitationShell>
+    );
   } else {
+    const Layout = template.layout === "long" ? LongLayout : PosterLayout;
     body = (
       <div className="h-full overflow-y-auto">
-        <PosterLayout pages={pages} />
+        <InvitationShell theme={template.theme}>
+          <Layout pages={pages} />
+        </InvitationShell>
       </div>
     );
   }
@@ -47,7 +52,7 @@ export function PhonePreview({
     <div className="relative mx-auto w-[300px] rounded-[2.4rem] border-[10px] border-neutral-900 bg-black shadow-2xl">
       <div className="absolute left-1/2 top-2 z-20 h-5 w-24 -translate-x-1/2 rounded-full bg-neutral-900" />
       <div className="h-[600px] overflow-hidden rounded-[1.7rem] bg-white">
-        <InvitationShell theme={template.theme}>{body}</InvitationShell>
+        {body}
       </div>
     </div>
   );

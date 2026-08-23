@@ -15,6 +15,13 @@
       "when": 1787455880682,
       "tag": "0001_worthless_kat_farrell",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787460390347,
+      "tag": "0002_blushing_colossus",
+      "breakpoints": true
     }
   ]
 }
