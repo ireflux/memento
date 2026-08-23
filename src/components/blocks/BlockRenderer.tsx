@@ -143,23 +143,3 @@ function BlockSwitch({
   }
 }
 
-export function renderPages(
-  content: InvitationContent,
-  theme: ThemeTokens,
-  options: {
-    slug?: string;
-    interactive?: boolean;
-    editable?: boolean;
-    blessings?: PublicBlessing[];
-  } = {},
-): ReactNode[] {
-  return content.pages.map((block, i) => (
-    <BlockRenderer
-      key={`${block.type}-${i}`}
-      block={block}
-      content={content}
-      theme={theme}
-      {...options}
-    />
-  ));
-}

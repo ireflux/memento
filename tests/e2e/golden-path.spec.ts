@@ -42,12 +42,15 @@ test.describe("golden path (requires DATABASE_URL)", () => {
     await guestPage.goto(`/i/${slug}`);
     await expect(guestPage.locator("h1")).toContainText("沈星回");
 
+    await guestPage.locator('button[aria-label="第 6 页"]').click();
+
     const nameInput = guestPage.getByPlaceholder("怎么称呼您");
     await expect(nameInput).toBeVisible();
     await nameInput.fill("王小明");
     await guestPage.locator("button", { hasText: "提 交 回 执" }).click();
     await expect(guestPage.locator("text=期待与您相见")).toBeVisible();
 
+    await guestPage.locator('button[aria-label="第 7 页"]').click();
     const blessingInput = guestPage.getByPlaceholder("写下您的祝福…");
     if (await blessingInput.isVisible()) {
       await blessingInput.fill("百年好合！");

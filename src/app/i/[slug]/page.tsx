@@ -6,7 +6,7 @@ import { InvitationShell } from "@/components/blocks/layouts/InvitationShell";
 import { FlipLayout } from "@/components/blocks/layouts/FlipLayout";
 import { LongLayout } from "@/components/blocks/layouts/StackLayouts";
 import { PosterLayout } from "@/components/blocks/layouts/StackLayouts";
-import { renderPages } from "@/components/blocks/BlockRenderer";
+import { renderPages } from "@/components/blocks/renderPages";
 import { MusicPlayer } from "@/components/blocks/MusicPlayer";
 import { ViewTracker } from "@/components/blocks/ViewTracker";
 

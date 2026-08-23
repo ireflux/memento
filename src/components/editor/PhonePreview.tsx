@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import type { LayoutType, InvitationContent } from "@/lib/validation/schemas";
 import { getTemplate } from "@/templates/registry";
-import { renderPages } from "@/components/blocks/BlockRenderer";
+import { renderPages } from "@/components/blocks/renderPages";
 import { InvitationShell } from "@/components/blocks/layouts/InvitationShell";
 import { FlipLayout } from "@/components/blocks/layouts/FlipLayout";
 import { LongLayout, PosterLayout } from "@/components/blocks/layouts/StackLayouts";
