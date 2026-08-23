@@ -75,7 +75,10 @@ export const rsvps = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("rsvps_invitation_idx").on(t.invitationId)],
+  (t) => [
+    index("rsvps_invitation_idx").on(t.invitationId),
+    index("rsvps_invitation_created_idx").on(t.invitationId, t.createdAt),
+  ],
 );
 
 export const blessings = pgTable(
@@ -93,8 +96,24 @@ export const blessings = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("blessings_invitation_idx").on(t.invitationId)],
+  (t) => [
+    index("blessings_invitation_idx").on(t.invitationId),
+    index("blessings_invitation_created_idx").on(
+      t.invitationId,
+      t.createdAt,
+    ),
+  ],
 );
+
+/** 管理码验证失败计数与锁定（防在线爆破）。验证成功后整行删除。 */
+export const codeAttempts = pgTable("code_attempts", {
+  slug: text("slug").primaryKey(),
+  failedCount: integer("failed_count").notNull().default(0),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
 
 export type InvitationRow = typeof invitations.$inferSelect;
 export type RsvpRow = typeof rsvps.$inferSelect;

@@ -1,3 +1,5 @@
+import { SafeImg } from "./SafeImg";
+
 export function CoverBlock({  names,
   dateText,
   subtitle,
@@ -14,10 +16,10 @@ export function CoverBlock({  names,
     <div className="relative flex w-full flex-col items-center justify-center py-10 text-center">
       {heroImageUrl ? (
         <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <SafeImg
             src={heroImageUrl}
             alt=""
+            loading="eager"
             className="absolute inset-0 h-full w-full object-cover"
           />
           <div className="absolute inset-0 bg-black/45" />
@@ -64,8 +66,7 @@ export function GalleryBlock({
     <div className={`grid gap-2.5 ${grid}`}>
       {images.map((img, i) => (
         <figure key={`${img.url}-${i}`} className="overflow-hidden rounded-2xl">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <SafeImg
             src={img.url}
             alt={img.caption ?? `照片 ${i + 1}`}
             loading="lazy"

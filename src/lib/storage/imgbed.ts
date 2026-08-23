@@ -1,6 +1,14 @@
 import "server-only";
 import { StorageError, type StorageProvider, type StoredFile, type UploadInput } from "./types";
 
+function toAbsoluteUrl(baseUrl: string, raw: string): string {
+  try {
+    return new URL(raw).toString();
+  } catch {
+    return new URL(raw, baseUrl).toString();
+  }
+}
+
 export class ImgBedProvider implements StorageProvider {
   constructor(
     private readonly baseUrl: string,
@@ -54,7 +62,7 @@ export class ImgBedProvider implements StorageProvider {
     }
     const url =
       first.publicUrl ??
-      (first.src ? `${this.baseUrl}${first.src}` : undefined);
+      (first.src ? toAbsoluteUrl(this.baseUrl, first.src) : undefined);
     if (!url) {
       throw new StorageError("存储服务未返回文件地址");
     }

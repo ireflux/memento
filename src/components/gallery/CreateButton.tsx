@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createInvitationAction } from "@/actions/invitations";
+import { copyText } from "@/lib/clipboard";
 
 interface Created {
   slug: string;
@@ -68,8 +69,9 @@ export function CreateButton({ templateId }: { templateId: string }) {
               <button
                 type="button"
                 onClick={async () => {
-                  await navigator.clipboard.writeText(created.code).catch(() => {});
-                  setCopied(true);
+                  const ok = await copyText(created.code);
+                  setCopied(ok);
+                  if (ok) setTimeout(() => setCopied(false), 2000);
                 }}
                 className="flex-1 rounded-full border border-neutral-200 py-3 text-sm text-neutral-600"
               >

@@ -3,6 +3,7 @@ import { LIMITS } from "@/lib/constants";
 
 const dateTimeString = z
   .string()
+  .refine((v) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v), "无效的时间格式")
   .refine((v) => !Number.isNaN(Date.parse(v)), "无效的时间格式");
 
 export const sceneTypeEnum = z.enum(["wedding", "birthday"]);

@@ -53,28 +53,26 @@ export function BlessingWall({
 
       {interactive ? (
         <div className="mb-6 space-y-3 rounded-2xl p-4" style={{ background: "var(--tk-surface)" }}>
-          <div className="flex gap-2">
-            <input
-              className="w-28 flex-none rounded-xl border border-[var(--tk-primary-soft)] bg-transparent px-3 py-2 text-sm text-[var(--tk-text)] placeholder:text-[var(--tk-muted)] outline-none focus:border-[var(--tk-primary)]"
-              placeholder="您的名字"
-              maxLength={20}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <input
-              className="min-w-0 flex-1 rounded-xl border border-[var(--tk-primary-soft)] bg-transparent px-3 py-2 text-sm text-[var(--tk-text)] placeholder:text-[var(--tk-muted)] outline-none focus:border-[var(--tk-primary)]"
-              placeholder="写下您的祝福…"
-              maxLength={200}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  void submit();
-                }
-              }}
-            />
-          </div>
+          <input
+            className="w-full rounded-xl border border-[var(--tk-primary-soft)] bg-transparent px-3 py-2 text-sm text-[var(--tk-text)] placeholder:text-[var(--tk-muted)] outline-none focus:border-[var(--tk-primary)]"
+            placeholder="您的名字"
+            maxLength={20}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <textarea
+            className="min-h-20 w-full resize-none rounded-xl border border-[var(--tk-primary-soft)] bg-transparent px-3 py-2 text-sm leading-relaxed text-[var(--tk-text)] placeholder:text-[var(--tk-muted)] outline-none focus:border-[var(--tk-primary)]"
+            placeholder="写下您的祝福…（Ctrl/⌘ + Enter 发送）"
+            maxLength={200}
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                void submit();
+              }
+            }}
+          />
           <div className="flex items-center justify-between">
             <span className="text-xs text-[var(--tk-muted)]">
               {status === "error" && message ? message : `${content.length}/200`}

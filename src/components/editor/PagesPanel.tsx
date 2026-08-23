@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Block, InvitationContent } from "@/lib/validation/schemas";
+import { LIMITS } from "@/lib/constants";
 import { ImageUploader } from "./ImageUploader";
 
 const BLOCK_LABELS: Record<Block["type"], string> = {
@@ -131,7 +132,10 @@ export function PagesPanel({
         ))}
       </ul>
 
-      <AddBlockMenu onAdd={add} />
+      <AddBlockMenu
+        onAdd={add}
+        disabled={pages.length >= LIMITS.maxPages}
+      />
 
       {selected != null && pages[selected] ? (
         <div className="rounded-2xl border border-neutral-200 bg-white p-4">
@@ -151,8 +155,10 @@ export function PagesPanel({
 
 function AddBlockMenu({
   onAdd,
+  disabled,
 }: {
   onAdd: (t: Block["type"]) => void;
+  disabled: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const addable: Block["type"][] = [
@@ -168,9 +174,14 @@ function AddBlockMenu({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full rounded-xl border border-neutral-200 py-2.5 text-sm text-neutral-600 hover:border-neutral-900 hover:text-neutral-900"
+        disabled={disabled}
+        className="w-full rounded-xl border border-neutral-200 py-2.5 text-sm text-neutral-600 transition-colors hover:border-neutral-900 hover:text-neutral-900 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {open ? "收起" : "+ 添加内容块"}
+        {disabled
+          ? `已达页数上限（${LIMITS.maxPages} 页）`
+          : open
+            ? "收起"
+            : "+ 添加内容块"}
       </button>
       {open ? (
         <div className="mt-2 grid grid-cols-2 gap-2">

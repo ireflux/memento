@@ -15,7 +15,7 @@ export function TemplateCard({
   return (
     <div className="group">
       <Link
-        href={`/?preview=${template.id}#templates`}
+        href={`/preview/${template.id}`}
         className="block aspect-[3/4] overflow-hidden rounded-2xl shadow-md shadow-neutral-900/5 transition-transform group-hover:-translate-y-1"
         style={{ background: t.bgGradient, color: t.text }}
         aria-label={`${template.name} 模板预览`}
@@ -28,7 +28,7 @@ export function TemplateCard({
             className="text-lg leading-snug"
             style={{ fontFamily: t.fontDisplay }}
           >
-            {template.scene === "wedding" ? "沈星回 · 顾时夜" : "小满"}
+            {template.scene === "wedding" ? "陆时 · 林晚" : "小满"}
           </p>
           <div className="h-px w-10 bg-current opacity-30" />
           <p className="text-[10px] tracking-[0.3em] opacity-70">

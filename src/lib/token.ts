@@ -109,6 +109,6 @@ export function manageCookieName(slug: string): string {
 }
 
 export function slugFromPath(pathname: string): string | null {
-  const match = /^\/(?:edit|manage|access)\/([A-Za-z0-9]{4,16})/.exec(pathname);
+  const match = /^\/(?:edit|manage|access)\/([A-Za-z0-9]{8})/.exec(pathname);
   return match ? match[1] : null;
 }

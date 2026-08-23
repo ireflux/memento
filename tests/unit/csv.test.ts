@@ -21,4 +21,23 @@ describe("toCsv", () => {
     const body = toCsv(["a", "b"], [[null, "x"]]).slice(1);
     expect(body).toBe("a,b\r\n,x");
   });
+
+  it("neutralizes formula injection prefixes (OWASP)", () => {
+    const body = toCsv(
+      ["姓名", "备注"],
+      [
+        ["=HYPERLINK(\"http://evil.com\")", "正常"],
+        ["+1|cmd", "@SUM(A1)"],
+        ["-2", "\tTAB"],
+      ],
+    ).slice(1);
+    expect(body).toBe(
+      '姓名,备注\r\n"\'=HYPERLINK(""http://evil.com"")",正常\r\n\'+1|cmd,\'@SUM(A1)\r\n\'-2,\'\tTAB',
+    );
+  });
+
+  it("does not touch ordinary cells", () => {
+    const body = toCsv(["手机号"], [["13800138000"]]).slice(1);
+    expect(body).toBe("手机号\r\n13800138000");
+  });
 });

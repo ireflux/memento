@@ -89,24 +89,24 @@ export function InfoForm({
             }}
           />
         </div>
-        <div>
-          <label className={labelCls}>背景音乐</label>
-          <select
-            className={inputCls}
-            value={info.musicId ?? ""}
-            onChange={(e) =>
-              onChange({ musicId: e.target.value || undefined })
-            }
-          >
-            <option value="">不使用音乐</option>
-            {MUSIC_LIBRARY.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.title}
-                {t.url ? "" : "（待上架）"}
-              </option>
-            ))}
-          </select>
-        </div>
+          <div>
+            <label className={labelCls}>背景音乐</label>
+            <select
+              className={inputCls}
+              value={info.musicId ?? ""}
+              onChange={(e) =>
+                onChange({ musicId: e.target.value || undefined })
+              }
+            >
+              <option value="">不使用音乐</option>
+              {MUSIC_LIBRARY.map((t) => (
+                <option key={t.id} value={t.id} disabled={!t.url}>
+                  {t.title}
+                  {t.url ? "" : "（待上架）"}
+                </option>
+              ))}
+            </select>
+          </div>
       </div>
 
       <div>
@@ -138,8 +138,8 @@ export function InfoForm({
             className={inputCls}
             inputMode="decimal"
             placeholder="纬度 lat"
-            defaultValue={info.lat ?? ""}
-            onBlur={(e) => {
+            value={info.lat ?? ""}
+            onChange={(e) => {
               const v = parseFloat(e.target.value);
               onChange({ lat: Number.isFinite(v) ? v : undefined });
             }}
@@ -148,8 +148,8 @@ export function InfoForm({
             className={inputCls}
             inputMode="decimal"
             placeholder="经度 lng"
-            defaultValue={info.lng ?? ""}
-            onBlur={(e) => {
+            value={info.lng ?? ""}
+            onChange={(e) => {
               const v = parseFloat(e.target.value);
               onChange({ lng: Number.isFinite(v) ? v : undefined });
             }}

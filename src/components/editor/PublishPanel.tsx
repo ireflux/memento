@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { setInvitationStatusAction } from "@/actions/invitations";
+import { copyText } from "@/lib/clipboard";
+import { useShareUrl } from "@/components/use-share-url";
 import { useRouter } from "next/navigation";
 
 const STATUS_TEXT = {
@@ -19,25 +21,25 @@ export function PublishPanel({
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "ok" | "fail">("idle");
   const [qr, setQr] = useState<string | null>(null);
-  const [shareUrl, setShareUrl] = useState("");
-
-  useEffect(() => {
-    const raf = requestAnimationFrame(() =>
-      setShareUrl(`${window.location.origin}/i/${slug}`),
-    );
-    return () => cancelAnimationFrame(raf);
-  }, [slug]);
+  const [qrError, setQrError] = useState(false);
+  const shareUrl = useShareUrl(`/i/${slug}`);
 
   useEffect(() => {
     if (!shareUrl) return;
     let alive = true;
-    import("qrcode").then(({ default: QRCode }) =>
-      QRCode.toDataURL(shareUrl, { width: 260, margin: 1 }).then((d) => {
-        if (alive) setQr(d);
-      }),
-    );
+    import("qrcode")
+      .then(({ default: QRCode }) => QRCode.toDataURL(shareUrl, { width: 260, margin: 1 }))
+      .then((d) => {
+        if (alive) {
+          setQr(d);
+          setQrError(false);
+        }
+      })
+      .catch(() => {
+        if (alive) setQrError(true); // 二维码生成失败时降级为纯链接分享
+      });
     return () => {
       alive = false;
     };
@@ -48,6 +50,12 @@ export function PublishPanel({
     await setInvitationStatusAction(slug, next);
     setBusy(false);
     router.refresh();
+  };
+
+  const copy = async () => {
+    const ok = await copyText(shareUrl);
+    setCopyState(ok ? "ok" : "fail");
+    setTimeout(() => setCopyState("idle"), ok ? 1500 : 3000);
   };
 
   const st = STATUS_TEXT[status];
@@ -95,16 +103,17 @@ export function PublishPanel({
           />
           <button
             type="button"
-            onClick={async () => {
-              await navigator.clipboard.writeText(shareUrl).catch(() => {});
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1500);
-            }}
+            onClick={() => void copy()}
             className="rounded-xl bg-neutral-900 px-4 py-2 text-sm text-white"
           >
-            {copied ? "✓" : "复制"}
+            {copyState === "ok" ? "✓" : copyState === "fail" ? "复制失败" : "复制"}
           </button>
         </div>
+        {copyState === "fail" ? (
+          <p className="mt-1.5 text-[11px] text-amber-600">
+            当前浏览器不支持自动复制，请长按链接手动复制
+          </p>
+        ) : null}
         <p className="mt-1.5 text-[11px] leading-relaxed text-neutral-400">
           微信内长按链接转发即可；发布后建议同时保存二维码印在纸质喜帖上。
         </p>
@@ -122,6 +131,12 @@ export function PublishPanel({
             下载二维码
           </a>
         </div>
+      ) : null}
+
+      {qrError && shareUrl ? (
+        <p className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-center text-xs text-amber-700">
+          二维码生成失败，请直接复制上方链接分享
+        </p>
       ) : null}
 
       <a

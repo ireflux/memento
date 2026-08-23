@@ -13,14 +13,9 @@ import { ViewTracker } from "@/components/blocks/ViewTracker";
 
 export const dynamic = "force-dynamic";
 
-const loadInvitation = cache(async (slug: string) => {
-  try {
-    return await getInvitationBySlug(slug);
-  } catch (e) {
-    console.error("[invitation] load failed", e);
-    return null;
-  }
-});
+// 不吞异常：查询失败（如数据库故障）向上抛给 error.tsx 呈现真实错误，
+// 仅当查询成功但无此行时才返回 null → notFound()
+const loadInvitation = cache((slug: string) => getInvitationBySlug(slug));
 
 export async function generateMetadata({
   params,
@@ -70,7 +65,8 @@ export default async function InvitationDisplayPage({
   const hasBlessingWall = content.pages.some((p) => p.type === "blessing-wall");
 
   let blessings = [] as Awaited<ReturnType<typeof getVisibleBlessings>>;
-  if (hasBlessingWall && slug.length > 0) {
+  if (hasBlessingWall) {
+    // 祝福列表属增强内容：加载失败降级为空列表，不阻塞请柬主体验
     try {
       blessings = await getVisibleBlessings(inv.id);
     } catch (e) {
@@ -92,7 +88,8 @@ export default async function InvitationDisplayPage({
           预 览 模 式 · 尚 未 发 布
         </div>
       ) : null}
-      <ViewTracker slug={slug} />
+      {/* 仅已发布的请柬计入浏览数，草稿预览不污染数据 */}
+      {inv.status === "published" ? <ViewTracker slug={slug} /> : null}
       <MusicPlayer trackId={content.info.musicId} />
       {inv.layout === "flip" ? (
         <FlipLayout pages={pages} />

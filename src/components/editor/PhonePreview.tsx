@@ -19,9 +19,11 @@ export function PhonePreview({
   content: InvitationContent;
   interactive?: boolean;
 }) {
+  // templateId 异常时按内容场景回退，避免生日请柬预览穿帮成婚礼主题
+  const isWeddingContent = "groomName" in content.info;
   const template =
     getTemplate(templateId) ??
-    getTemplate("wedding-vermilion")!;
+    getTemplate(isWeddingContent ? "wedding-vermilion" : "birthday-candle")!;
 
   const pages = renderPages(content, template.theme, {
     slug,

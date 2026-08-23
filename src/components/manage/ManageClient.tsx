@@ -4,9 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
+  clearManageSessionAction,
   setInvitationStatusAction,
 } from "@/actions/invitations";
 import { toggleBlessingVisibilityAction } from "@/actions/guests";
+import { copyText } from "@/lib/clipboard";
+import { useShareUrl } from "@/components/use-share-url";
 import { formatDateTimeShort } from "@/lib/format";
 
 interface RsvpItem {
@@ -50,7 +53,8 @@ export function ManageClient({
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "ok" | "fail">("idle");
+  const shareUrl = useShareUrl(`/i/${slug}`);
 
   const attendingYes = rsvps.filter((r) => r.attending === "yes");
   const totalGuests = attendingYes.reduce(
@@ -65,10 +69,18 @@ export function ManageClient({
     router.refresh();
   };
 
-  const shareUrl =
-    typeof window === "undefined"
-      ? `/i/${slug}`
-      : `${window.location.origin}/i/${slug}`;
+  const copy = async () => {
+    const ok = await copyText(shareUrl);
+    setCopyState(ok ? "ok" : "fail");
+    setTimeout(() => setCopyState("idle"), ok ? 1500 : 3000);
+  };
+
+  const logout = async () => {
+    await clearManageSessionAction(slug);
+    // 硬导航：登出后彻底重置客户端缓存与内存状态
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.href = "/";
+  };
 
   return (
     <div className="min-h-dvh bg-[#f4f1ec] pb-24">
@@ -84,6 +96,13 @@ export function ManageClient({
           >
             返回编辑
           </Link>
+          <button
+            type="button"
+            onClick={() => void logout()}
+            className="rounded-full border border-neutral-200 px-3.5 py-1.5 text-xs text-neutral-500 hover:border-neutral-900"
+          >
+            退出
+          </button>
         </div>
       </header>
 
@@ -129,16 +148,22 @@ export function ManageClient({
             )}
             <button
               type="button"
-              onClick={async () => {
-                await navigator.clipboard.writeText(shareUrl).catch(() => {});
-                setCopied(true);
-                setTimeout(() => setCopied(false), 1500);
-              }}
-              className="rounded-full bg-neutral-900 px-5 py-2.5 text-sm text-white"
+              onClick={() => void copy()}
+              disabled={!shareUrl}
+              className="rounded-full bg-neutral-900 px-5 py-2.5 text-sm text-white disabled:opacity-60"
             >
-              {copied ? "已复制 ✓" : "复制分享链接"}
+              {copyState === "ok"
+                ? "已复制 ✓"
+                : copyState === "fail"
+                  ? "复制失败"
+                  : "复制分享链接"}
             </button>
           </div>
+          {copyState === "fail" ? (
+            <p className="mt-2 text-xs text-amber-600">
+              当前浏览器不支持自动复制，请手动复制：{shareUrl}
+            </p>
+          ) : null}
         </section>
 
         <section className="grid grid-cols-4 gap-3">

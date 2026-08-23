@@ -71,6 +71,10 @@ export async function getRsvps(invitationId: string): Promise<RsvpRow[]> {
     .orderBy(desc(rsvps.createdAt));
 }
 
+/**
+ * 原子自增浏览数。UPDATE 带 slug 条件：slug 不存在时零命中、无副作用，
+ * 配合路由层的限流，避免对任意 slug 的盲目写入。
+ */
 export async function incrementViewCount(slug: string): Promise<void> {
   const db = getDb();
   await db

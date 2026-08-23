@@ -1,9 +1,9 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { invitations } from "@/lib/db/schema";
+import { codeAttempts, invitations } from "@/lib/db/schema";
 import {
   generateManageCode,
   generateSlug,
@@ -13,15 +13,12 @@ import {
   signManageToken,
   verifyCode,
 } from "@/lib/auth";
-import { LIMITS, MANAGE_COOKIE_MAX_AGE } from "@/lib/constants";
+import { LIMITS, MANAGE_COOKIE_MAX_AGE, RATE_LIMITS } from "@/lib/constants";
+import type { ActionResult } from "@/lib/action-result";
+import { clientIpFromHeader, rateLimit } from "@/lib/rate-limit";
 import { countImages, safeParseContent } from "@/lib/validation/schemas";
+import { createInvitationInputSchema, verifyCodeInputSchema } from "@/lib/validation/schemas";
 import { buildInitialContent, getTemplate } from "@/templates/registry";
-
-export interface ActionResult<T = undefined> {
-  ok: boolean;
-  message?: string;
-  data?: T;
-}
 
 function cookieOptions() {
   return {
@@ -45,7 +42,22 @@ function isUniqueViolation(e: unknown): boolean {
 export async function createInvitationAction(
   templateId: string,
 ): Promise<ActionResult<{ slug: string; code: string }>> {
-  const template = getTemplate(templateId);
+  const parsed = createInvitationInputSchema.safeParse({ templateId });
+  if (!parsed.success) return { ok: false, message: "模板不存在" };
+
+  const hdrs = await headers();
+  const ip = clientIpFromHeader(hdrs.get("x-forwarded-for"));
+  if (
+    !rateLimit(
+      `create:${ip}`,
+      RATE_LIMITS.createPerHourPerIp,
+      60 * 60 * 1000,
+    )
+  ) {
+    return { ok: false, message: "操作过于频繁，请一小时后再试" };
+  }
+
+  const template = getTemplate(parsed.data.templateId);
   if (!template) return { ok: false, message: "模板不存在" };
 
   const db = getDb();
@@ -77,18 +89,75 @@ export async function verifyManageCodeAction(
   slug: string,
   code: string,
 ): Promise<ActionResult> {
+  const parsed = verifyCodeInputSchema.safeParse({ slug, code });
+  if (!parsed.success) {
+    return { ok: false, message: "请输入正确的管理码格式" };
+  }
+  // 先做长度受限的输入校验，再进入昂贵的 scrypt 计算
+  const { slug: validSlug } = parsed.data;
+
   const db = getDb();
   const rows = await db
-    .select({ manageCode: invitations.manageCode })
+    .select({ id: invitations.id, manageCode: invitations.manageCode })
     .from(invitations)
-    .where(eq(invitations.slug, slug))
+    .where(eq(invitations.slug, validSlug))
     .limit(1);
-  const stored = rows[0]?.manageCode;
-  if (!stored || !verifyCode(code, stored)) {
-    return { ok: false, message: "管理码不正确" };
+  const inv = rows[0];
+  if (!inv) return { ok: false, message: "管理码不正确" };
+
+  const attemptRows = await db
+    .select({ failedCount: codeAttempts.failedCount, lockedUntil: codeAttempts.lockedUntil })
+    .from(codeAttempts)
+    .where(eq(codeAttempts.slug, validSlug))
+    .limit(1);
+  const attempt = attemptRows[0];
+  if (attempt?.lockedUntil && attempt.lockedUntil.getTime() > Date.now()) {
+    return {
+      ok: false,
+      message: `错误次数过多，已临时锁定，请 ${RATE_LIMITS.codeLockMinutes} 分钟后再试`,
+    };
   }
+
+  if (!verifyCode(parsed.data.code, inv.manageCode)) {
+    await recordFailedAttempt(validSlug, attempt?.failedCount ?? 0);
+    const left = Math.max(
+      0,
+      RATE_LIMITS.codeMaxFailedAttempts - (attempt?.failedCount ?? 0) - 1,
+    );
+    return {
+      ok: false,
+      message: left > 0 ? `管理码不正确，还可尝试 ${left} 次` : "管理码不正确",
+    };
+  }
+
+  await db.delete(codeAttempts).where(eq(codeAttempts.slug, validSlug));
+
   const store = await cookies();
-  store.set(manageCookieName(slug), signManageToken(slug), cookieOptions());
+  store.set(manageCookieName(validSlug), signManageToken(validSlug), cookieOptions());
+  return { ok: true };
+}
+
+async function recordFailedAttempt(slug: string, previousCount: number) {
+  const failedCount = previousCount + 1;
+  const locked =
+    failedCount >= RATE_LIMITS.codeMaxFailedAttempts
+      ? new Date(Date.now() + RATE_LIMITS.codeLockMinutes * 60 * 1000)
+      : null;
+  const db = getDb();
+  await db
+    .insert(codeAttempts)
+    .values({ slug, failedCount, lockedUntil: locked, updatedAt: new Date() })
+    .onConflictDoUpdate({
+      target: codeAttempts.slug,
+      set: { failedCount, lockedUntil: locked, updatedAt: new Date() },
+    });
+}
+
+export async function clearManageSessionAction(
+  slug: string,
+): Promise<ActionResult> {
+  const store = await cookies();
+  store.delete(manageCookieName(slug));
   return { ok: true };
 }
 
@@ -149,7 +218,7 @@ export async function saveInvitationContentAction(
   }
 
   const serialized = JSON.stringify(parsed.data);
-  if (serialized.length > LIMITS.contentBytes) {
+  if (Buffer.byteLength(serialized, "utf8") > LIMITS.contentBytes) {
     return { ok: false, message: "内容过大，请减少文字或照片" };
   }
   if (countImages(parsed.data) > LIMITS.maxImagesPerGallery) {

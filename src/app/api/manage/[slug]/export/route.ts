@@ -15,6 +15,9 @@ export async function GET(
 ) {
   try {
     const { slug } = await params;
+    if (!/^[A-Za-z0-9]{8}$/.test(slug)) {
+      throw new ApiError(400, "bad_request", "参数错误");
+    }
     if (!(await hasManageSession(slug))) {
       throw new ApiError(403, "forbidden", "请先输入管理码");
     }

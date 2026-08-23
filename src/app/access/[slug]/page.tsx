@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getInvitationBySlug } from "@/lib/queries";
+import { hasManageSession } from "@/lib/auth";
 import { CodeGateForm } from "@/components/access/CodeGateForm";
 
 export const dynamic = "force-dynamic";
@@ -21,13 +22,20 @@ export default async function AccessPage({
 }: PageProps<"/access/[slug]">) {
   const { slug } = await params;
   const sp = await searchParams;
-  const inv = await getInvitationBySlug(slug).catch(() => null);
-  if (!inv) notFound();
 
   const next = safeNext(sp.next, `/edit/${slug}`);
   if (!next.startsWith("/edit/") && !next.startsWith("/manage/")) {
     redirect(`/edit/${slug}`);
   }
+
+  // 已持有有效会话时不再要求重复输码
+  if (await hasManageSession(slug)) {
+    redirect(next);
+  }
+
+  // 查询异常向上抛给 error.tsx；仅「确认无此请柬」才渲染 404
+  const inv = await getInvitationBySlug(slug);
+  if (!inv) notFound();
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-8 bg-[#faf7f2] px-6">

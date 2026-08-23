@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { InvitationContent, LayoutType, SceneType } from "@/lib/validation/schemas";
-import { saveInvitationContentAction, setInvitationTemplateAction } from "@/actions/invitations";
+import {
+  clearManageSessionAction,
+  saveInvitationContentAction,
+  setInvitationTemplateAction,
+} from "@/actions/invitations";
 import { templatesForScene } from "@/templates/registry";
 import { InfoForm } from "./InfoForm";
 import { PagesPanel } from "./PagesPanel";
@@ -12,11 +16,11 @@ import { PhonePreview } from "./PhonePreview";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
-const SAVE_TEXT: Record<SaveState, string> = {
+const SAVE_LABEL: Record<SaveState, string> = {
   idle: "",
   saving: "保存中…",
   saved: "已自动保存 ✓",
-  error: "保存失败，请检查内容",
+  error: "保存失败",
 };
 
 export function EditorClient({
@@ -41,41 +45,109 @@ export function EditorClient({
   const [tab, setTab] = useState<"info" | "pages" | "publish">("info");
   const [selectedPage, setSelectedPage] = useState<number | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [saveError, setSaveError] = useState("");
+  const [notice, setNotice] = useState("");
+  /** 渲染用的未保存标记（与 dirty ref 同步，ref 供事件监听器同步读取） */
+  const [unsaved, setUnsaved] = useState(false);
+
+  // 最新内容快照：让在途的防抖保存始终拿到最新值
+  const contentRef = useRef(content);
   const dirty = useRef(false);
+  /** 本地编辑计数：保存期间发生新编辑时，成功响应不得清掉 dirty 标记 */
+  const editCount = useRef(0);
+  /** 发出的请求序号：旧请求迟到的响应一律忽略 */
+  const reqSeq = useRef(0);
+  const savingRef = useRef(false);
+
+  const doSave = useCallback(async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    try {
+      // 循环直到「快照后无新编辑」的一次保存成功；期间的新编辑会被立即再保存
+      for (;;) {
+        const snapshot = contentRef.current;
+        const editsAtSnapshot = editCount.current;
+        const seq = ++reqSeq.current;
+
+        const res = await saveInvitationContentAction(slug, snapshot);
+        if (seq !== reqSeq.current) return; // 已有更新的保存接管，本次响应作废
+
+        if (res.ok) {
+          if (editCount.current === editsAtSnapshot) {
+            dirty.current = false;
+            setUnsaved(false);
+            setSaveState("saved");
+            setSaveError("");
+            return;
+          }
+          continue; // 保存期间用户仍在编辑，再保存一次最新内容
+        }
+        setSaveState("error");
+        setSaveError(res.message ?? "保存失败，请检查网络后重试");
+        return;
+      }
+    } finally {
+      savingRef.current = false;
+    }
+  }, [slug]);
 
   useEffect(() => {
     if (!dirty.current) return;
     setSaveState("saving");
-    const t = setTimeout(async () => {
-      const res = await saveInvitationContentAction(slug, content);
-      if (res.ok) {
-        setSaveState("saved");
-        dirty.current = false;
-      } else {
-        setSaveState("error");
-      }
-    }, 1200);
+    const t = setTimeout(() => void doSave(), 1200);
     return () => clearTimeout(t);
-  }, [content, slug]);
+  }, [content, doSave]);
+
+  // 有未保存修改时拦截页面关闭/刷新
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (dirty.current) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, []);
+
+  const applyContent = (next: InvitationContent) => {
+    editCount.current += 1;
+    dirty.current = true;
+    setUnsaved(true);
+    contentRef.current = next;
+    setContent(next);
+  };
 
   const patchInfo = (patch: Partial<InvitationContent["info"]>) => {
-    dirty.current = true;
-    setContent(
-      (c) =>
-        ({ ...c, info: { ...c.info, ...patch } }) as InvitationContent,
+    applyContent(
+      ({ ...contentRef.current, info: { ...contentRef.current.info, ...patch } }) as InvitationContent,
     );
   };
   const patchPages = (pages: InvitationContent["pages"]) => {
-    dirty.current = true;
-    setContent((c) => ({ ...c, pages }));
+    applyContent({ ...contentRef.current, pages });
   };
 
   const switchTemplate = async (id: string) => {
     const t = templatesForScene(sceneType).find((x) => x.id === id);
     if (!t || t.id === templateId) return;
-    setTemplateId(t.id);
+    const prevId = templateId;
+    const prevLayout = layout;
+    setTemplateId(t.id); // 乐观更新
     setLayout(t.layout);
-    await setInvitationTemplateAction(slug, id);
+    const res = await setInvitationTemplateAction(slug, id);
+    if (!res.ok) {
+      setTemplateId(prevId); // 失败回滚，避免 UI 与数据库漂移
+      setLayout(prevLayout);
+      setNotice(res.message ?? "切换失败，请重试");
+      setTimeout(() => setNotice(""), 3000);
+    }
+  };
+
+  const logout = async () => {
+    await clearManageSessionAction(slug);
+    // 硬导航：登出后彻底重置客户端缓存与内存状态
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.href = "/";
   };
 
   const tabs = [
@@ -92,16 +164,43 @@ export function EditorClient({
             拾光柬
           </Link>
           <span className="truncate text-xs text-neutral-400">/ {slug}</span>
-          <span className="ml-auto text-xs text-neutral-400">
-            {SAVE_TEXT[saveState]}
+          <span className={`ml-auto text-xs ${saveState === "error" ? "text-red-500" : "text-neutral-400"}`}>
+            {SAVE_LABEL[saveState]}
           </span>
+          {unsaved ? (
+            <button
+              type="button"
+              onClick={() => void doSave()}
+              disabled={saveState === "saving"}
+              className="rounded-full bg-neutral-900 px-3.5 py-1.5 text-xs text-white disabled:opacity-60"
+            >
+              立即保存
+            </button>
+          ) : null}
           <Link
             href={`/manage/${slug}`}
             className="rounded-full border border-neutral-200 px-3.5 py-1.5 text-xs text-neutral-600 hover:border-neutral-900"
           >
             数据后台
           </Link>
+          <button
+            type="button"
+            onClick={() => void logout()}
+            className="rounded-full border border-neutral-200 px-3.5 py-1.5 text-xs text-neutral-500 hover:border-neutral-900"
+          >
+            退出
+          </button>
         </div>
+        {saveState === "error" && saveError ? (
+          <p className="bg-red-50 px-4 py-1.5 text-center text-xs text-red-600">
+            {saveError}
+          </p>
+        ) : null}
+        {notice ? (
+          <p className="bg-amber-50 px-4 py-1.5 text-center text-xs text-amber-700">
+            {notice}
+          </p>
+        ) : null}
       </header>
 
       <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-6 lg:flex-row lg:items-start">

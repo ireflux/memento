@@ -82,7 +82,7 @@ export function CountdownTimer({
       ) : null}
       <div className="flex items-start justify-center gap-2.5">
         {cell(days, "天")}
-        {cell(hours % (days > 0 ? Infinity : 24), "时")}
+        {cell(hours, "时")}
         {cell(minutes, "分")}
         {cell(seconds, "秒")}
       </div>

@@ -23,6 +23,7 @@ export function RsvpForm({
   const [attending, setAttending] = useState<Attending>("yes");
   const [partySize, setPartySize] = useState(1);
   const [phone, setPhone] = useState("");
+  const [noteText, setNoteText] = useState("");
   const [status, setStatus] = useState<
     "idle" | "submitting" | "done" | "error"
   >("idle");
@@ -65,7 +66,7 @@ export function RsvpForm({
       attending,
       partySize,
       phone,
-      note: "",
+      note: noteText,
     });
     if (res.ok) {
       setStatus("done");
@@ -161,6 +162,19 @@ export function RsvpForm({
           inputMode="tel"
           maxLength={20}
           placeholder="方便我们联系您"
+        />
+      </div>
+      <div>
+        <label className={labelCls} htmlFor={`rsvp-note-${slug}`}>
+          备注（选填）
+        </label>
+        <textarea
+          id={`rsvp-note-${slug}`}
+          className={`${inputCls} min-h-16 resize-none leading-relaxed`}
+          value={noteText}
+          onChange={(e) => setNoteText(e.target.value)}
+          maxLength={100}
+          placeholder="如忌口、需要儿童座椅等"
         />
       </div>
       {status === "error" && message ? (
