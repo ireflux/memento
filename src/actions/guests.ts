@@ -108,7 +108,10 @@ export async function toggleBlessingVisibilityAction(
 
   await db
     .update(blessings)
-    .set({ status: hidden ? "hidden" : "visible" })
+    .set({
+      status: hidden ? "hidden" : "visible",
+      updatedAt: new Date(),
+    })
     .where(
       and(
         eq(blessings.id, blessingId),

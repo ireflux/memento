@@ -95,6 +95,9 @@ export const blessings = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (t) => [index("blessings_invitation_idx").on(t.invitationId)],
 );
