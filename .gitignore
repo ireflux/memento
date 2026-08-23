@@ -42,3 +42,14 @@ next-env.d.ts
 
 # allow example env
 !.env.example
+
+# playwright
+/test-results/
+/playwright-report/
+
+# neon cli 本地状态
+.neon
+
+# 编辑器
+.idea/
+.vscode/
