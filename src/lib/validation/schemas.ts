@@ -138,9 +138,22 @@ export const createInvitationInputSchema = z.object({
 });
 
 export const verifyCodeInputSchema = z.object({
-  slug: z.string().min(4).max(16),
+  slug: z
+    .string()
+    .regex(/^[A-Za-z0-9]{8}$/, "无效的链接"),
   code: z.string().min(4).max(12),
 });
+
+/** 主人后台修正宾客回执：允许改出席状态与人数（删除走独立 Action）。 */
+export const rsvpPatchSchema = z
+  .object({
+    attending: z.enum(["yes", "no", "maybe"]).optional(),
+    partySize: z.coerce.number().int().min(0).max(20).optional(),
+  })
+  .refine((v) => v.attending !== undefined || v.partySize !== undefined, {
+    message: "没有需要修改的字段",
+  });
+export type RsvpPatch = z.infer<typeof rsvpPatchSchema>;
 
 export function countImages(content: InvitationContent): number {
   let n = 0;

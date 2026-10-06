@@ -34,19 +34,23 @@ export function FlipLayout({
 
   if (pages.length === 0) return null;
 
+  const current = pages[idx];
+
   return (
     <div
       className={`relative overflow-hidden ${fill ? "h-full" : "h-dvh"}`}
       onTouchStart={(e) => {
         const t = e.touches[0];
+        if (!t) return;
         touch.current = { x: t.clientX, y: t.clientY };
       }}
       onTouchEnd={(e) => {
-        if (!touch.current) return;
         const t = e.changedTouches[0];
-        const dx = t.clientX - touch.current.x;
-        const dy = t.clientY - touch.current.y;
+        const start = touch.current;
         touch.current = null;
+        if (!t || !start) return;
+        const dx = t.clientX - start.x;
+        const dy = t.clientY - start.y;
         if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.5) {
           go(dx < 0 ? idx + 1 : idx - 1);
         }
@@ -63,7 +67,7 @@ export function FlipLayout({
           className="absolute inset-0 flex items-center justify-center px-6 py-14"
         >
           <div className="max-h-full w-full max-w-md overflow-y-auto">
-            {pages[idx]}
+            {current}
           </div>
         </motion.div>
       </AnimatePresence>

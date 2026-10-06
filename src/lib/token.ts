@@ -1,7 +1,7 @@
 import {
   createHmac,
   randomBytes,
-  scryptSync,
+  scrypt,
   timingSafeEqual,
 } from "node:crypto";
 import {
@@ -21,7 +21,7 @@ function randomString(alphabet: string, length: number): string {
     const bytes = randomBytes(length);
     for (const b of bytes) {
       if (b >= max) continue;
-      out += alphabet[b % alphabet.length];
+      out += alphabet.charAt(b % alphabet.length);
       if (out.length === length) break;
     }
   }
@@ -36,18 +36,43 @@ export function generateManageCode(): string {
   return randomString(CODE_ALPHABET, LIMITS.manageCodeLength);
 }
 
-export function hashCode(code: string): string {
+/**
+ * scrypt 走线程池的异步版本：同步版（scryptSync）会独占事件循环，
+ * 在单实例 serverless 上等于把整个实例的 CPU 卡住 ~100ms，
+ * 并发验证管理码时会拖垮同实例的其他请求。
+ *
+ * 参数刻意保持 node:crypto 默认值不变：存量请柬的 manage_code 是用默认参数
+ * 算出来的，改参数会导致所有已发出的请柬管理码永久失效。
+ */
+function scryptKey(
+  code: string,
+  salt: Buffer,
+  keylen: number,
+): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    scrypt(code, salt, keylen, (err, derivedKey) => {
+      if (err) reject(err);
+      else resolve(derivedKey);
+    });
+  });
+}
+
+export async function hashCode(code: string): Promise<string> {
   const salt = randomBytes(16);
-  const hash = scryptSync(code, salt, 64);
+  const hash = await scryptKey(code, salt, 64);
   return `${salt.toString("hex")}:${hash.toString("hex")}`;
 }
 
-export function verifyCode(code: string, stored: string): boolean {
+export async function verifyCode(
+  code: string,
+  stored: string,
+): Promise<boolean> {
   const [saltHex, hashHex] = stored.split(":");
   if (!saltHex || !hashHex) return false;
   try {
     const expected = Buffer.from(hashHex, "hex");
-    const actual = scryptSync(
+    if (expected.length === 0) return false;
+    const actual = await scryptKey(
       code,
       Buffer.from(saltHex, "hex"),
       expected.length,
@@ -109,6 +134,7 @@ export function manageCookieName(slug: string): string {
 }
 
 export function slugFromPath(pathname: string): string | null {
-  const match = /^\/(?:edit|manage|access)\/([A-Za-z0-9]{8})/.exec(pathname);
-  return match ? match[1] : null;
+  const match = /^\/(?:edit|manage|access)\/([A-Za-z0-9]+)/.exec(pathname);
+  const slug = match?.[1];
+  return slug && slug.length === LIMITS.slugLength ? slug : null;
 }

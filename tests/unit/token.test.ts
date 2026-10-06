@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   generateManageCode,
   generateSlug,
   hashCode,
   manageCookieName,
   signManageToken,
+  slugFromPath,
   verifyCode,
   verifyManageToken,
 } from "@/lib/token";
@@ -26,20 +27,28 @@ describe("generateManageCode", () => {
 });
 
 describe("hashCode / verifyCode", () => {
-  it("round-trips a valid code", () => {
-    const stored = hashCode("K7Q2M9");
+  it("round-trips a valid code", async () => {
+    const stored = await hashCode("K7Q2M9");
     expect(stored).not.toContain("K7Q2M9");
-    expect(verifyCode("K7Q2M9", stored)).toBe(true);
+    await expect(verifyCode("K7Q2M9", stored)).resolves.toBe(true);
   });
 
-  it("rejects wrong code", () => {
-    const stored = hashCode("AAAAAA");
-    expect(verifyCode("BBBBBB", stored)).toBe(false);
+  it("rejects wrong code", async () => {
+    const stored = await hashCode("AAAAAA");
+    await expect(verifyCode("BBBBBB", stored)).resolves.toBe(false);
   });
 
-  it("rejects malformed stored value", () => {
-    expect(verifyCode("AAAAAA", "garbage")).toBe(false);
-    expect(verifyCode("AAAAAA", "")).toBe(false);
+  it("rejects malformed stored value", async () => {
+    await expect(verifyCode("AAAAAA", "garbage")).resolves.toBe(false);
+    await expect(verifyCode("AAAAAA", "")).resolves.toBe(false);
+    await expect(verifyCode("AAAAAA", ":")).resolves.toBe(false);
+    // 非 hex 内容会得到空 buffer，keylen=0 在 scrypt 中报错 → false 而非抛错
+    await expect(verifyCode("AAAAAA", "zzzz:zzzz")).resolves.toBe(false);
+  });
+
+  it("uses a per-code salt", async () => {
+    const [a, b] = await Promise.all([hashCode("AAAAAA"), hashCode("AAAAAA")]);
+    expect(a).not.toBe(b);
   });
 });
 
@@ -66,7 +75,37 @@ describe("manage token", () => {
     expect(verifyManageToken("not-a-token", "abc12345")).toBe(false);
   });
 
+  it("rejects an expired token", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+      const token = signManageToken("abc12345");
+      expect(verifyManageToken(token, "abc12345")).toBe(true);
+      // 推进到 7 天有效期之后
+      vi.setSystemTime(new Date("2026-01-09T00:00:00Z"));
+      expect(verifyManageToken(token, "abc12345")).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("uses per-slug cookie names", () => {
     expect(manageCookieName("abc12345")).toBe("mng_abc12345");
+  });
+});
+
+describe("slugFromPath", () => {
+  it("extracts the slug from guarded routes", () => {
+    expect(slugFromPath("/edit/abc12345")).toBe("abc12345");
+    expect(slugFromPath("/manage/abc12345")).toBe("abc12345");
+    expect(slugFromPath("/access/abc12345")).toBe("abc12345");
+  });
+
+  it("ignores other routes and wrong-length slugs", () => {
+    expect(slugFromPath("/i/abc12345")).toBeNull();
+    expect(slugFromPath("/")).toBeNull();
+    expect(slugFromPath("/edit/short")).toBeNull();
+    expect(slugFromPath("/edit/toolongslug")).toBeNull();
+    expect(slugFromPath("/edit/abc-2345")).toBeNull();
   });
 });

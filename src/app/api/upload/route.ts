@@ -81,15 +81,16 @@ export async function POST(request: Request) {
     if (!inv) {
       throw new ApiError(404, "not_found", "请柬不存在");
     }
-    const [{ n }] = await getDb()
+    const countRows = await getDb()
       .select({ n: count() })
       .from(mediaAssets)
       .where(eq(mediaAssets.invitationId, inv.id));
+    const n = countRows[0]?.n ?? 0;
     if (n >= LIMITS.maxMediaAssetsPerInvitation) {
       throw new ApiError(
         429,
         "quota_exceeded",
-        `该请柬上传的图片数已达上限（${LIMITS.maxMediaAssetsPerInvitation} 张），请先删除不再使用的照片`,
+        `该请柬已登记 ${n} 张图片，达到上限。请在「页面」中移除不再需要的照片，保存后会自动释放配额。`,
       );
     }
 

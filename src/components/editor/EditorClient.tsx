@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { InvitationContent, LayoutType, SceneType } from "@/lib/validation/schemas";
 import {
   clearManageSessionAction,
   saveInvitationContentAction,
   setInvitationTemplateAction,
 } from "@/actions/invitations";
+import { safeAction } from "@/lib/client-action";
 import { templatesForScene } from "@/templates/registry";
 import { InfoForm } from "./InfoForm";
 import { PagesPanel } from "./PagesPanel";
@@ -58,9 +60,14 @@ export function EditorClient({
   /** 发出的请求序号：旧请求迟到的响应一律忽略 */
   const reqSeq = useRef(0);
   const savingRef = useRef(false);
+  /** 在途保存的 promise：发布/跳转/退出前 await 它，确保先落库再离开 */
+  const inflightRef = useRef<Promise<boolean> | null>(null);
 
-  const doSave = useCallback(async () => {
-    if (savingRef.current) return;
+  const router = useRouter();
+
+  const doSave = useCallback(async (): Promise<boolean> => {
+    if (!dirty.current) return true;
+    if (savingRef.current) return false; // 单飞：已有保存进行中，调用方应先 await inflight
     savingRef.current = true;
     try {
       // 循环直到「快照后无新编辑」的一次保存成功；期间的新编辑会被立即再保存
@@ -69,8 +76,11 @@ export function EditorClient({
         const editsAtSnapshot = editCount.current;
         const seq = ++reqSeq.current;
 
-        const res = await saveInvitationContentAction(slug, snapshot);
-        if (seq !== reqSeq.current) return; // 已有更新的保存接管，本次响应作废
+        const res = await safeAction(() =>
+          saveInvitationContentAction(slug, snapshot),
+        );
+        // 已有更新的保存接管，本次响应作废（当前单飞下不可达，保守视作未保存）
+        if (seq !== reqSeq.current) return false;
 
         if (res.ok) {
           if (editCount.current === editsAtSnapshot) {
@@ -78,25 +88,49 @@ export function EditorClient({
             setUnsaved(false);
             setSaveState("saved");
             setSaveError("");
-            return;
+            return true;
           }
           continue; // 保存期间用户仍在编辑，再保存一次最新内容
         }
         setSaveState("error");
         setSaveError(res.message ?? "保存失败，请检查网络后重试");
-        return;
+        return false;
       }
     } finally {
       savingRef.current = false;
     }
   }, [slug]);
 
+  /**
+   * 落库并等待完成；无未保存内容时直接返回，不产生请求。
+   * 发布 / 跳转 / 退出前必须先 await 它 —— 否则会把未落库的内容丢在身后，
+   * 宾客收到的请柬与主人在预览里看到的不是同一份。
+   */
+  const flushSave = useCallback(async (): Promise<boolean> => {
+    try {
+      const inflight = inflightRef.current;
+      if (inflight) await inflight;
+      if (!dirty.current) return true;
+      const p = doSave();
+      inflightRef.current = p;
+      try {
+        return await p;
+      } finally {
+        if (inflightRef.current === p) inflightRef.current = null;
+      }
+    } catch (e) {
+      // flush 是所有「离开前」动作的闸门，绝不能把异常抛给调用方
+      console.error("[editor] flush failed", e);
+      return false;
+    }
+  }, [doSave]);
+
   useEffect(() => {
     if (!dirty.current) return;
     setSaveState("saving");
-    const t = setTimeout(() => void doSave(), 1200);
+    const t = setTimeout(() => void flushSave(), 1200);
     return () => clearTimeout(t);
-  }, [content, doSave]);
+  }, [content, flushSave]);
 
   // 有未保存修改时拦截页面关闭/刷新
   useEffect(() => {
@@ -134,7 +168,7 @@ export function EditorClient({
     const prevLayout = layout;
     setTemplateId(t.id); // 乐观更新
     setLayout(t.layout);
-    const res = await setInvitationTemplateAction(slug, id);
+    const res = await safeAction(() => setInvitationTemplateAction(slug, id));
     if (!res.ok) {
       setTemplateId(prevId); // 失败回滚，避免 UI 与数据库漂移
       setLayout(prevLayout);
@@ -143,8 +177,19 @@ export function EditorClient({
     }
   };
 
+  /** 离开编辑器前统一走这里：先确保内容落库，再导航。 */
+  const navigateAfterSave = async (href: string) => {
+    if (!(await flushSave())) {
+      setNotice("内容尚未保存成功，请先解决保存问题再离开");
+      setTimeout(() => setNotice(""), 3000);
+      return;
+    }
+    router.push(href);
+  };
+
   const logout = async () => {
-    await clearManageSessionAction(slug);
+    await flushSave();
+    await safeAction(() => clearManageSessionAction(slug));
     // 硬导航：登出后彻底重置客户端缓存与内存状态
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = "/";
@@ -170,19 +215,20 @@ export function EditorClient({
           {unsaved ? (
             <button
               type="button"
-              onClick={() => void doSave()}
+              onClick={() => void flushSave()}
               disabled={saveState === "saving"}
               className="rounded-full bg-neutral-900 px-3.5 py-1.5 text-xs text-white disabled:opacity-60"
             >
               立即保存
             </button>
           ) : null}
-          <Link
-            href={`/manage/${slug}`}
+          <button
+            type="button"
+            onClick={() => void navigateAfterSave(`/manage/${slug}`)}
             className="rounded-full border border-neutral-200 px-3.5 py-1.5 text-xs text-neutral-600 hover:border-neutral-900"
           >
             数据后台
-          </Link>
+          </button>
           <button
             type="button"
             onClick={() => void logout()}
@@ -283,7 +329,11 @@ export function EditorClient({
 
           {tab === "publish" ? (
             <div className="rounded-2xl bg-white p-5 shadow-sm">
-              <PublishPanel slug={slug} status={status} />
+              <PublishPanel
+                slug={slug}
+                status={status}
+                beforePublish={flushSave}
+              />
             </div>
           ) : null}
         </section>

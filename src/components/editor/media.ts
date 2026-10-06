@@ -50,19 +50,13 @@ interface PreparedUpload {
 }
 
 /**
- * 决定上传负载：超过阈值或 png/webp 一律压缩为 JPEG；
- * 其余小文件保持原格式。ext 与 MIME 永远取自同一分支，避免名实不符。
+ * 决定上传负载：超过体积阈值、或本来就是 png/webp（尺寸/体积不可控）
+ * 一律重编码为 JPEG；其余已是小体积 JPEG 的文件原样上传。
+ * ext 与 MIME 永远取自同一分支，避免名实不符（服务端会按 magic bytes 复核）。
  */
 async function prepareUpload(file: File): Promise<PreparedUpload> {
   const shouldCompress =
     file.size > 300 * 1024 || /image\/(png|webp)/.test(file.type);
-  if (!shouldCompress && file.type === "image/png") {
-    return { blob: file, fileName: `${Date.now()}.png`, mime: "image/png" };
-  }
-  if (!shouldCompress && file.type === "image/webp") {
-    // 小体积 webp 保持原样（服务端白名单允许 webp）
-    return { blob: file, fileName: `${Date.now()}.webp`, mime: "image/webp" };
-  }
   const blob = shouldCompress ? await compressImage(file) : file;
   return { blob, fileName: `${Date.now()}.jpg`, mime: "image/jpeg" };
 }

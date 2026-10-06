@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { submitBlessingAction } from "@/actions/guests";
+import { safeAction } from "@/lib/client-action";
 import type { PublicBlessing } from "@/lib/queries";
 
 export function BlessingWall({
@@ -29,10 +30,12 @@ export function BlessingWall({
       return;
     }
     setStatus("sending");
-    const res = await submitBlessingAction(slug, {
-      guestName: name,
-      content,
-    });
+    const res = await safeAction(() =>
+      submitBlessingAction(slug, {
+        guestName: name,
+        content,
+      }),
+    );
     if (res.ok && res.data) {
       setItems((prev) => [res.data as PublicBlessing, ...prev]);
       setName("");

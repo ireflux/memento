@@ -4,7 +4,9 @@ import {
   countImages,
   parseContent,
   rsvpInputSchema,
+  rsvpPatchSchema,
   safeParseContent,
+  verifyCodeInputSchema,
 } from "@/lib/validation/schemas";
 
 const weddingContent = {
@@ -132,6 +134,38 @@ describe("blessingInputSchema", () => {
       blessingInputSchema.safeParse({ guestName: "李四", content: "  " })
         .success,
     ).toBe(false);
+  });
+});
+
+describe("verifyCodeInputSchema", () => {
+  it("only accepts an 8-char alphanumeric slug", () => {
+    expect(verifyCodeInputSchema.safeParse({ slug: "abc12345", code: "ABCDEF" }).success).toBe(true);
+    expect(verifyCodeInputSchema.safeParse({ slug: "short", code: "ABCDEF" }).success).toBe(false);
+    expect(verifyCodeInputSchema.safeParse({ slug: "toolongslug", code: "ABCDEF" }).success).toBe(false);
+    expect(verifyCodeInputSchema.safeParse({ slug: "abc-2345", code: "ABCDEF" }).success).toBe(false);
+    expect(verifyCodeInputSchema.safeParse({ slug: "abc12345", code: "AB" }).success).toBe(false);
+  });
+});
+
+describe("rsvpPatchSchema", () => {
+  it("accepts a partial correction", () => {
+    expect(rsvpPatchSchema.safeParse({ attending: "yes" }).success).toBe(true);
+    expect(rsvpPatchSchema.safeParse({ partySize: 4 }).success).toBe(true);
+  });
+
+  it("coerces party size from a string input", () => {
+    const parsed = rsvpPatchSchema.parse({ partySize: "6" });
+    expect(parsed.partySize).toBe(6);
+  });
+
+  it("rejects an empty patch", () => {
+    expect(rsvpPatchSchema.safeParse({}).success).toBe(false);
+  });
+
+  it("rejects out-of-range or unknown values", () => {
+    expect(rsvpPatchSchema.safeParse({ partySize: 99 }).success).toBe(false);
+    expect(rsvpPatchSchema.safeParse({ partySize: -1 }).success).toBe(false);
+    expect(rsvpPatchSchema.safeParse({ attending: "sure" }).success).toBe(false);
   });
 });
 

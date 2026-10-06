@@ -21,17 +21,27 @@ export function ImageUploader({
     setBusy(true);
     setError("");
     const urls: string[] = [];
-    try {
-      for (const file of Array.from(files).slice(0, multiple ? 9 : 1)) {
+    const failed: string[] = [];
+    // 逐张上传、逐张收集：中途某张失败不能丢掉已成功的 URL，
+    // 否则那几张图既没进内容、又在服务端留下登记（既丢数据又白占配额）。
+    for (const file of Array.from(files).slice(0, multiple ? 9 : 1)) {
+      try {
         urls.push(await uploadImage(slug, file));
+      } catch (e) {
+        failed.push(
+          file.name || "某张图片",
+          e instanceof Error ? `：${e.message}` : "",
+        );
       }
-      onUploaded(urls);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "上传失败");
-    } finally {
-      setBusy(false);
-      if (inputRef.current) inputRef.current.value = "";
     }
+    if (urls.length > 0) onUploaded(urls);
+    if (failed.length > 0) {
+      setError(
+        `${failed.join("、")}${urls.length > 0 ? `；另有 ${urls.length} 张已上传成功` : ""}`,
+      );
+    }
+    setBusy(false);
+    if (inputRef.current) inputRef.current.value = "";
   };
 
   return (

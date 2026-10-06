@@ -41,6 +41,9 @@ export function PagesPanel({
   onChange: (pages: InvitationContent["pages"]) => void;
 }) {
   const pages = content.pages;
+  // 选中项解析成局部变量：既避免三次重复索引，也让编辑器拿到非空类型
+  const selectedIndex = selected ?? -1;
+  const selectedBlock = selectedIndex >= 0 ? pages[selectedIndex] : undefined;
 
   const updateBlock = (i: number, patch: Partial<Block>) => {
     const next = pages.map((p, idx) =>
@@ -53,7 +56,11 @@ export function PagesPanel({
     const j = i + delta;
     if (j < 0 || j >= pages.length) return;
     const next = [...pages];
-    [next[i], next[j]] = [next[j], next[i]];
+    const moved = next[i];
+    const displaced = next[j];
+    if (moved === undefined || displaced === undefined) return;
+    next[i] = displaced;
+    next[j] = moved;
     onChange(next);
     onSelect(j);
   };
@@ -137,15 +144,15 @@ export function PagesPanel({
         disabled={pages.length >= LIMITS.maxPages}
       />
 
-      {selected != null && pages[selected] ? (
+      {selectedBlock ? (
         <div className="rounded-2xl border border-neutral-200 bg-white p-4">
           <h4 className="mb-3 text-sm font-medium text-neutral-800">
-            编辑「{BLOCK_LABELS[pages[selected].type]}」
+            编辑「{BLOCK_LABELS[selectedBlock.type]}」
           </h4>
           <BlockPropsForm
             slug={slug}
-            block={pages[selected]}
-            onChange={(patch) => updateBlock(selected, patch)}
+            block={selectedBlock}
+            onChange={(patch) => updateBlock(selectedIndex, patch)}
           />
         </div>
       ) : null}
@@ -252,10 +259,10 @@ function BlockPropsForm({
             ) : (
               <ImageUploader
                 slug={slug}
-                onUploaded={(urls) =>
-                  urls[0] &&
-                  onChange({ heroImageUrl: urls[0] } as Partial<Block>)
-                }
+                onUploaded={(urls) => {
+                  const first = urls[0];
+                  if (first) onChange({ heroImageUrl: first } as Partial<Block>);
+                }}
               />
             )}
           </div>

@@ -2,6 +2,7 @@ import { hasManageSession } from "@/lib/auth";
 import { jsonError, ApiError } from "@/lib/api";
 import { getInvitationBySlug, getRsvps } from "@/lib/queries";
 import { toCsv } from "@/lib/csv";
+import { formatDateTimeMinute } from "@/lib/format";
 
 const ATTENDING_TEXT: Record<string, string> = {
   yes: "出席",
@@ -33,7 +34,8 @@ export async function GET(
         r.partySize,
         r.phone ?? "",
         r.note ?? "",
-        r.createdAt.toISOString().replace("T", " ").slice(0, 16),
+        // 按 Asia/Shanghai 展示：回执时间要为主人可直接使用的中文本地时间
+        formatDateTimeMinute(r.createdAt.toISOString()),
       ]),
     );
 

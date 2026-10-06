@@ -1,0 +1,10 @@
+# 私人页面：编辑、后台、验证码入口，以及只提供 JSON 的接口
+User-agent: *
+Disallow: /edit/
+Disallow: /manage/
+Disallow: /access/
+Disallow: /api/
+
+# 请柬展示页 /i/[slug] 允许抓取（微信等平台需要读取标题与描述生成转发卡片），
+# 但页面自身通过 <meta name="robots" content="noindex, nofollow"> 拒绝入索引，
+# 避免宾客姓名、地址与祝福内容被搜索引擎收录。

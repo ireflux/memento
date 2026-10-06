@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { verifyManageCodeAction } from "@/actions/invitations";
+import { safeAction } from "@/lib/client-action";
 
 export function CodeGateForm({
   slug,
@@ -21,7 +22,7 @@ export function CodeGateForm({
       setError("请输入完整的管理码");
       return;
     }
-    const res = await verifyManageCodeAction(slug, code.trim());
+    const res = await safeAction(() => verifyManageCodeAction(slug, code.trim()));
     if (!res.ok) {
       setError(res.message ?? "管理码不正确");
       return;

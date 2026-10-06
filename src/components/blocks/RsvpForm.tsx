@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { submitRsvpAction } from "@/actions/guests";
+import { safeAction } from "@/lib/client-action";
 
 type Attending = "yes" | "maybe" | "no";
 
@@ -61,13 +62,17 @@ export function RsvpForm({
       return;
     }
     setStatus("submitting");
-    const res = await submitRsvpAction(slug, {
-      guestName,
-      attending,
-      partySize,
-      phone,
-      note: noteText,
-    });
+    // safeAction：Server Action 抛错时也必须回到可重试状态，
+    // 否则按钮会永远停在「提交中…」
+    const res = await safeAction(() =>
+      submitRsvpAction(slug, {
+        guestName,
+        attending,
+        partySize,
+        phone,
+        note: noteText,
+      }),
+    );
     if (res.ok) {
       setStatus("done");
     } else {
@@ -142,7 +147,7 @@ export function RsvpForm({
             value={partySize}
             onChange={(e) => setPartySize(Number(e.target.value))}
           >
-            {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
               <option key={n} value={n} className="text-black">
                 {n} 位
               </option>

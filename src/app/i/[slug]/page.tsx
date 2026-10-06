@@ -35,6 +35,9 @@ export async function generateMetadata({
       inv.sceneType === "wedding"
         ? `诚邀您参加 ${who} 的婚礼典礼`
         : `诚邀您参加 ${who} 的生日派对`,
+    // 请柬含宾客姓名与祝福内容，不应进公开索引；
+    // 用 noindex 而非 robots.txt 屏蔽 —— 后者会让微信的分享卡片抓不到标题与描述。
+    robots: { index: false, follow: false },
   };
 }
 

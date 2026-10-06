@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { setInvitationStatusAction } from "@/actions/invitations";
+import { safeAction } from "@/lib/client-action";
 import { copyText } from "@/lib/clipboard";
 import { useShareUrl } from "@/components/use-share-url";
 import { useRouter } from "next/navigation";
@@ -15,12 +16,16 @@ const STATUS_TEXT = {
 export function PublishPanel({
   slug,
   status,
+  beforePublish,
 }: {
   slug: string;
   status: "draft" | "published" | "closed";
+  /** 由编辑器注入：先把待保存内容落库，再改状态/预览 */
+  beforePublish?: () => Promise<boolean>;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const [copyState, setCopyState] = useState<"idle" | "ok" | "fail">("idle");
   const [qr, setQr] = useState<string | null>(null);
   const [qrError, setQrError] = useState(false);
@@ -45,11 +50,35 @@ export function PublishPanel({
     };
   }, [shareUrl]);
 
+  /** 任何「离开当前未落库状态」的操作前先 flush，返回是否可继续。 */
+  const ensureSaved = async (): Promise<boolean> => {
+    const saved = (await beforePublish?.()) ?? true;
+    if (!saved) {
+      setError("内容尚未保存成功（可能是网络问题），请稍后重试");
+    }
+    return saved;
+  };
+
   const setStatus = async (next: "published" | "closed") => {
     setBusy(true);
-    await setInvitationStatusAction(slug, next);
+    setError("");
+    if (!(await ensureSaved())) {
+      setBusy(false);
+      return;
+    }
+    const res = await safeAction(() => setInvitationStatusAction(slug, next));
     setBusy(false);
+    if (!res.ok) {
+      setError(res.message ?? "操作失败，请重试");
+      return;
+    }
     router.refresh();
+  };
+
+  const preview = async () => {
+    setError("");
+    if (!(await ensureSaved())) return;
+    window.open(`/i/${slug}`, "_blank", "noopener");
   };
 
   const copy = async () => {
@@ -88,6 +117,12 @@ export function PublishPanel({
           结束活动（宾客将看到结束页）
         </button>
       )}
+
+      {error ? (
+        <p className="rounded-xl bg-red-50 px-3 py-2 text-center text-xs text-red-600">
+          {error}
+        </p>
+      ) : null}
 
       <div>
         <label className="mb-1 block text-xs font-medium text-neutral-500">
@@ -139,14 +174,13 @@ export function PublishPanel({
         </p>
       ) : null}
 
-      <a
-        href={`/i/${slug}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block rounded-xl border border-neutral-200 py-2.5 text-center text-sm text-neutral-600 hover:border-neutral-900"
+      <button
+        type="button"
+        onClick={() => void preview()}
+        className="block w-full rounded-xl border border-neutral-200 py-2.5 text-center text-sm text-neutral-600 hover:border-neutral-900"
       >
         手机预览 ↗
-      </a>
+      </button>
     </div>
   );
 }

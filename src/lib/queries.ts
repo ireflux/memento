@@ -16,6 +16,19 @@ export async function getInvitationBySlug(
   return rows[0] ?? null;
 }
 
+/** 只需要「slug 是否存在 + 主键」的场景用它，避免整行（含 content jsonb）回传。 */
+export async function getInvitationIdBySlug(
+  slug: string,
+): Promise<string | null> {
+  const db = getDb();
+  const rows = await db
+    .select({ id: invitations.id })
+    .from(invitations)
+    .where(eq(invitations.slug, slug))
+    .limit(1);
+  return rows[0]?.id ?? null;
+}
+
 export interface PublicBlessing {
   id: string;
   guestName: string;

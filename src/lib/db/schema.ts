@@ -4,6 +4,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uuid,
@@ -105,15 +106,25 @@ export const blessings = pgTable(
   ],
 );
 
-/** 管理码验证失败计数与锁定（防在线爆破）。验证成功后整行删除。 */
-export const codeAttempts = pgTable("code_attempts", {
-  slug: text("slug").primaryKey(),
-  failedCount: integer("failed_count").notNull().default(0),
-  lockedUntil: timestamp("locked_until", { withTimezone: true }),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+/**
+ * 管理码验证失败计数与锁定（防在线爆破）。验证成功后整行删除。
+ *
+ * 按 (slug, ip) 复合主键计数：只按 slug 计会让任何知道链接的人
+ * 把主人永久锁在门外（每 15 分钟 5 次，可无限重复）。
+ */
+export const codeAttempts = pgTable(
+  "code_attempts",
+  {
+    slug: text("slug").notNull(),
+    ip: text("ip").notNull().default("unknown"),
+    failedCount: integer("failed_count").notNull().default(0),
+    lockedUntil: timestamp("locked_until", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.slug, t.ip] })],
+);
 
 export type InvitationRow = typeof invitations.$inferSelect;
 export type RsvpRow = typeof rsvps.$inferSelect;

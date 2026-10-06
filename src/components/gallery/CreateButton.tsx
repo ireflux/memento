@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createInvitationAction } from "@/actions/invitations";
+import { safeAction } from "@/lib/client-action";
 import { copyText } from "@/lib/clipboard";
 
 interface Created {
@@ -22,14 +23,12 @@ export function CreateButton({ templateId }: { templateId: string }) {
     setCreating(true);
     setError("");
     try {
-      const res = await createInvitationAction(templateId);
+      const res = await safeAction(() => createInvitationAction(templateId));
       if (res.ok && res.data) {
         setCreated(res.data);
       } else {
         setError(res.message ?? "创建失败，请重试");
       }
-    } catch {
-      setError("网络异常，请重试");
     } finally {
       setCreating(false);
     }
