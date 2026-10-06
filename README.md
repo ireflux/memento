@@ -35,7 +35,8 @@ npm run dev                  # http://localhost:3000
 | `npm run build` / `npm start` | 生产构建 / 启动 |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | TypeScript 检查 |
-| `npm test` | Vitest 单元测试 |
+| `npm test` | Vitest 单元测试（集成用例无 `DATABASE_URL` 时自动跳过） |
+| `npm run test:integration` | Server Actions 集成测试（会写库，请指向 Neon 分支库） |
 | `npx playwright test` | E2E（需先 `npx playwright install chromium`；黄金路径用例需要 `DATABASE_URL`，未配置时自动跳过） |
 | `npm run db:generate` | 由 schema 变更生成迁移 |
 | `npm run db:migrate` | 应用迁移到 `DATABASE_URL` |
@@ -47,9 +48,15 @@ npm run dev                  # http://localhost:3000
 3. Neon 中对主库执行迁移：本地 `DATABASE_URL=<neon连接串> npm run db:migrate`
 4. （上线前）给 ImgBed 绑定自定义域名 —— `*.pages.dev` 在中国大陆不可达
 
+> 迁移必须先于代码发布：`code_attempts` 在 `0004` 中新增了 `ip` 列并改为
+> `(slug, ip)` 复合主键，未应用迁移时管理码验证会直接报错。
+
 ## 已知限制（MVP）
 
-- 管理码仅创建时展示一次，丢失无法找回（连续输错 5 次将锁定 15 分钟）
-- 进程内限流为单实例近似有效（创建 5 次/小时/IP、浏览 10 次/分钟），推广前替换为共享存储
+- 管理码仅创建时展示一次，丢失无法找回（同一 slug + IP 连错 5 次锁定 15 分钟）
+- 图片配额随「保存内容时移除照片」自动释放；但 ImgBed 没有公开的删除 API，**物理文件仍会残留在服务端**，清理任务待建
+- 进程内限流为单实例近似有效（创建 5 次/小时/IP、验证管理码 60 次/小时/IP、浏览 10 次/分钟、回执与祝福 20 次/小时），推广前替换为共享存储
 - 背景音乐曲库条目待上架音频文件：把 mp3 上传到 ImgBed 后，将 URL 填入 `src/lib/music-library.ts` 对应条目即生效；未上架曲目不会出现在宾客端
-- 上传的图片在登记数据库失败时可能产生 ImgBed 孤儿文件（会记录日志，清理任务待建）
+- 上传的图片在登记数据库失败时可能产生 ImgBed 孤儿文件（会记录日志；下次保存内容时未被引用的登记会被回收，物理文件仍残留）
+- ⚠️ **上线阻断项：媒体域名**。`.env.example` 与曲库当前都指向 `*.pages.dev`，该域名在中国大陆不可达 —— 需给 ImgBed 绑定自定义域名并实测微信内加载，否则图片裂开、音乐无声
+- 尚不支持删除请柬（三张子表是逻辑外键，删除时需在事务中显式清理）
